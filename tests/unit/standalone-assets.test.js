@@ -1,9 +1,12 @@
+import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mkdtempSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { copyStandaloneAssets } from "../../scripts/copy-standalone-assets.mjs";
+
+const { copyDeepSeekPowAssets } = createRequire(import.meta.url)("../../cli/scripts/build-cli.js");
 
 function createBuildFixture(distDir) {
   const projectRoot = mkdtempSync(join(tmpdir(), "9router-standalone-assets-"));
@@ -37,6 +40,20 @@ describe("standalone build assets", () => {
       .toBe("static asset");
   });
 
+  it("copies DeepSeek PoW worker and sibling hash next to cwd-relative open-sse/lib", () => {
+    const projectRoot = createBuildFixture(".next");
+    mkdirSync(join(projectRoot, "open-sse", "lib"), { recursive: true });
+    writeFileSync(join(projectRoot, "open-sse", "lib", "deepseek-pow-worker.mjs"), "worker");
+    writeFileSync(join(projectRoot, "open-sse", "lib", "deepseek-pow-hash.js"), "hash");
+
+    copyStandaloneAssets({ projectRoot, distDir: ".next" });
+
+    expect(readFileSync(join(projectRoot, ".next", "standalone", "open-sse", "lib", "deepseek-pow-worker.mjs"), "utf8"))
+      .toBe("worker");
+    expect(readFileSync(join(projectRoot, ".next", "standalone", "open-sse", "lib", "deepseek-pow-hash.js"), "utf8"))
+      .toBe("hash");
+  });
+
   // Without the wrapper beside server.js nothing can prove a request is local.
   it("copies the request-sanitizing server wrapper into the standalone output", () => {
     const projectRoot = createBuildFixture(".next");
@@ -50,6 +67,8 @@ describe("standalone build assets", () => {
 
   it("does not modify workspace-traced CLI builds", () => {
     const projectRoot = createBuildFixture(".next-cli-build");
+    mkdirSync(join(projectRoot, "open-sse", "lib"), { recursive: true });
+    writeFileSync(join(projectRoot, "open-sse", "lib", "deepseek-pow-hash.js"), "hash");
     const previousMode = process.env.NEXT_TRACING_ROOT_MODE;
     process.env.NEXT_TRACING_ROOT_MODE = "workspace";
 
@@ -62,5 +81,20 @@ describe("standalone build assets", () => {
 
     expect(() => readFileSync(join(projectRoot, ".next-cli-build", "standalone", ".next-cli-build", "static", "chunks", "app.js")))
       .toThrow();
+    expect(() => readFileSync(join(projectRoot, ".next-cli-build", "standalone", "open-sse", "lib", "deepseek-pow-hash.js")))
+      .toThrow();
+  });
+
+  it("CLI pack copies DeepSeek PoW worker siblings into the app tree", () => {
+    const appDir = mkdtempSync(join(tmpdir(), "9router-cli-pow-src-"));
+    const cliAppDir = mkdtempSync(join(tmpdir(), "9router-cli-pow-dst-"));
+    mkdirSync(join(appDir, "open-sse", "lib"), { recursive: true });
+    writeFileSync(join(appDir, "open-sse", "lib", "deepseek-pow-worker.mjs"), "worker");
+    writeFileSync(join(appDir, "open-sse", "lib", "deepseek-pow-hash.js"), "hash");
+
+    copyDeepSeekPowAssets(appDir, cliAppDir);
+
+    expect(readFileSync(join(cliAppDir, "open-sse", "lib", "deepseek-pow-worker.mjs"), "utf8")).toBe("worker");
+    expect(readFileSync(join(cliAppDir, "open-sse", "lib", "deepseek-pow-hash.js"), "utf8")).toBe("hash");
   });
 });

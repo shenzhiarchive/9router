@@ -1,3 +1,9 @@
+# Unreleased (fork patch on v0.5.112)
+
+## Fixes
+- **DeepSeek Web login**: treat a fresh-profile `userToken` wrapper as not ready unless `value` is a real string credential. Anonymous/null/empty/non-string/malformed JSON wrappers no longer pass the length fallback, so Login via Browser keeps waiting instead of closing and later reporting `userToken is invalid or expired`.
+- **DeepSeek Web packaging**: copy `deepseek-pow-worker.mjs` together with sibling `deepseek-pow-hash.js` into Next standalone and the CLI pack so a later chat call does not fail with `Cannot find module` after a successful login. This is packaging completeness, not the login-readiness bug.
+
 # v0.5.112 (2026-10-28)
 
 ## Features
