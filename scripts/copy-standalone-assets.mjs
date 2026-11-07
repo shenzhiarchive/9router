@@ -1,6 +1,20 @@
-import { cpSync, existsSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+
+const DEEPSEEK_POW_ASSETS = ["deepseek-pow-worker.mjs", "deepseek-pow-hash.js"];
+
+function copyDeepSeekPowAssets(projectRoot, standaloneDir) {
+  // Worker 用 cwd 相对路径启动，并相对 import 同目录 hash；打包必须成对带上。
+  const destinationDir = resolve(standaloneDir, "open-sse", "lib");
+  for (const name of DEEPSEEK_POW_ASSETS) {
+    const source = resolve(projectRoot, "open-sse", "lib", name);
+    if (!existsSync(source)) continue;
+    mkdirSync(destinationDir, { recursive: true });
+    cpSync(source, resolve(destinationDir, name), { force: true });
+    console.log(`[standalone-assets] Copied ${name} to ${destinationDir}`);
+  }
+}
 
 export function copyStandaloneAssets({ projectRoot = process.cwd(), distDir = process.env.NEXT_DIST_DIR || ".next" } = {}) {
   if (process.env.NEXT_TRACING_ROOT_MODE === "workspace") {
@@ -37,6 +51,8 @@ export function copyStandaloneAssets({ projectRoot = process.cwd(), distDir = pr
     cpSync(serverWrapperSource, serverWrapperDestination, { force: true });
     console.log(`[standalone-assets] Copied custom-server.js to ${serverWrapperDestination}`);
   }
+
+  copyDeepSeekPowAssets(projectRoot, standaloneDir);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(dirname(fileURLToPath(import.meta.url)), "copy-standalone-assets.mjs")) {

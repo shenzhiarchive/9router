@@ -110,6 +110,21 @@ function resolveStandaloneBuild(appDir, buildDistDir) {
   return { standaloneApp, standaloneRoot };
 }
 
+function copyDeepSeekPowAssets(appDir, cliAppDir) {
+  // Worker is spawned from process.cwd()/open-sse/lib and imports its sibling
+  // hash file; Next tracing does not follow that runtime import.
+  const names = ["deepseek-pow-worker.mjs", "deepseek-pow-hash.js"];
+  for (const name of names) {
+    const src = path.join(appDir, "open-sse", "lib", name);
+    const dest = path.join(cliAppDir, "open-sse", "lib", name);
+    if (!fs.existsSync(src)) {
+      throw new Error(`DeepSeek PoW asset missing: ${src}`);
+    }
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(src, dest);
+  }
+}
+
 function copyStandaloneBuild(appDir, buildDistDir, cliAppDir) {
   const { standaloneApp, standaloneRoot } = resolveStandaloneBuild(appDir, buildDistDir);
   copyRecursive(standaloneApp, cliAppDir);
@@ -218,6 +233,16 @@ function buildCliPackage() {
   } else {
     console.error("❌ custom-server.js not found — without it no request can be proven local,");
     console.error("   so the packaged CLI would demand an API key for its own dashboard and /v1.");
+    process.exit(1);
+  }
+
+  // Step 3c: cwd-relative DeepSeek PoW worker + sibling hash (chat after web login).
+  console.log("3️⃣ c Copying DeepSeek PoW worker assets...");
+  try {
+    copyDeepSeekPowAssets(appDir, cliAppDir);
+    console.log("✅ Copied DeepSeek PoW worker assets\n");
+  } catch (error) {
+    console.error("❌", error.message || error);
     process.exit(1);
   }
 
@@ -346,6 +371,7 @@ function buildCliPackage() {
 module.exports = {
   assertRequiredApiArtifacts,
   copyStandaloneBuild,
+  copyDeepSeekPowAssets,
   mergeServerArtifacts,
 };
 

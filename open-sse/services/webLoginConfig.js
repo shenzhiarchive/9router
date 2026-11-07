@@ -50,14 +50,22 @@ export const WEB_LOGIN_CONFIGS = {
     // The executor expects the raw token value, not a cookie header.
     credentialFrom: "localStorageValue",
     validateToken: (value) => {
-      if (typeof value !== "string" || !value.trim()) return false;
-      try {
-        const parsed = JSON.parse(value);
-        const token = typeof parsed?.value === "string" ? parsed.value : value;
-        return typeof token === "string" && token.length >= 20;
-      } catch {
-        return value.length >= 20;
+      // 未登录/匿名访客会在同一 key 写入 {"value":null,"__version":"0"}。
+      // 旧逻辑在 value 非字符串时退回检查整段 JSON 长度，30 字符占位会被当成已登录。
+      if (typeof value !== "string") return false;
+      const raw = value.trim();
+      if (!raw) return false;
+      if (raw.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(raw);
+          // 包装必须是带字符串 value 的对象；解析失败或 value 无效都不能当凭证。
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+          return typeof parsed.value === "string" && parsed.value.trim().length >= 20;
+        } catch {
+          return false;
+        }
       }
+      return raw.length >= 20;
     },
   },
   "uc-web": {
